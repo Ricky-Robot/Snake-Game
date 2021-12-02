@@ -77,7 +77,7 @@ status 			db 		0 		;0 stop-pause, 1 activo
 ;Variables para el juego
 score 			dw 		0
 hi_score	 	dw 		0
-speed 			db 		0
+speed 			db 		1
 
 ;Variable 'head' de 16 bits. Datos de la cabeza de la serpiente
 ;Valor inicial: 00 00 0010111 01100b
@@ -309,6 +309,16 @@ conversion_mouse:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Aqui va la lógica de la posicion del mouse;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	;Si el mouse fue presionado en el renglon 11, 12 o 13
+	;se revisara si se presiono un boton de velocidad
+	cmp dx, 11
+	je boton_speed
+	cmp dx, 12
+	je boton_speed
+	cmp dx, 13
+	je boton_speed
+
 	;Si el mouse fue presionado en el renglon 0
 	;se va a revisar si fue dentro del boton [X]
 	cmp dx,0
@@ -319,6 +329,43 @@ conversion_mouse:
 restringir:
 	posiciona_cursor_mouse 160d, dx		;Como el mouse salio del area permitida, lo regresamos a la última columna permitida en su mismo renglon
 	jmp mouse_no_clic 	;Volvemos a leer la posición del mouse
+
+boton_speed:
+	cmp cx, 12d
+	je boton_speed_down
+	cmp cx, 13d
+	je boton_speed_down
+	cmp cx, 14d
+	je boton_speed_down
+
+	cmp cx, 16d
+	je boton_speed_up
+	cmp cx, 17d
+	je boton_speed_up
+	cmp cx, 18d
+	je boton_speed_up
+
+	jmp mouse_no_clic
+
+boton_speed_down:
+	cmp [speed], 1d
+	je mouse_no_clic
+	mov al, [speed]
+	dec ax
+	mov [speed], al
+	call IMPRIME_SPEED
+
+	jmp mouse_no_clic
+
+boton_speed_up:
+	cmp [speed], 99d
+	je mouse_no_clic
+	mov al, [speed]
+	inc ax
+	mov [speed], al
+	call IMPRIME_SPEED
+
+	jmp mouse_no_clic
 
 boton_x:
 	jmp boton_x1
@@ -450,7 +497,7 @@ salir:				;inicia etiqueta salir
 	DATOS_INICIALES proc
 		mov [score],0
 		mov [hi_score],0
-		mov [speed],0
+		mov [speed],1
 		call IMPRIME_SCORE
 		call IMPRIME_HISCORE
 		call IMPRIME_SPEED
