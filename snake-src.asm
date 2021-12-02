@@ -397,10 +397,15 @@ boton_controles:
 	cmp cx, 17d
 	je boton_play
 
+	jmp mouse_no_clic
+
+;Si el botón presionado fue pausa, se realiza lo siguiente
 boton_pausa:
 
+;Si el botón presionado fue reiniciar, se realiza lo siguiente
 boton_reiniciar:
 
+;Si el botón presionado fue play, se realiza lo siguiente
 boton_play:
 
 boton_x:
