@@ -335,6 +335,7 @@ restringir:
 	posiciona_cursor_mouse 160d, dx		;Como el mouse salio del area permitida, lo regresamos a la última columna permitida en su mismo renglon
 	jmp mouse_no_clic 	;Volvemos a leer la posición del mouse
 
+;Se realizan las comparaciones para ver que botón fue el presionado
 boton_speed:
 	cmp cx, 12d
 	je boton_speed_down
@@ -352,6 +353,7 @@ boton_speed:
 
 	jmp mouse_no_clic
 
+;Se encarga bajar el valor de la velocidad, no puede ser menos que uno
 boton_speed_down:
 	cmp [speed], 1d
 	je mouse_no_clic
@@ -361,7 +363,7 @@ boton_speed_down:
 	call IMPRIME_SPEED
 
 	jmp mouse_no_clic
-
+;Se encarga de subir el valor de la velocidad, no puede ser mayor que 99
 boton_speed_up:
 	cmp [speed], 99d
 	je mouse_no_clic
