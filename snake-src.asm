@@ -401,12 +401,22 @@ boton_controles:
 
 ;Si el botón presionado fue pausa, se realiza lo siguiente
 boton_pausa:
+	cmp [status], 0 	;Si el juego esta en pausa, no se realiza nada y volvemos a ver el estado del mouse
+	je mouse_no_clic
+
+	mov [status], 0 	;Si el juego esta en play se modifica el status a pausa y volvemos a ver el estado del mouse
+	jmp mouse_no_clic
 
 ;Si el botón presionado fue reiniciar, se realiza lo siguiente
 boton_reiniciar:
+	call IMPRIME_DATOS_INICIALES 	;Se reinician los valores a los datos iniciales y se vuelven a dibujar en pantalla
+
+	jmp mouse_no_clic  	;Volvemos a verificar el estado del mouse
 
 ;Si el botón presionado fue play, se realiza lo siguiente
 boton_play:
+	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
+	jmp mouse_no_clic
 
 boton_x:
 	jmp boton_x1
@@ -539,6 +549,7 @@ salir:				;inicia etiqueta salir
 		mov [score],0
 		mov [hi_score],0
 		mov [speed],1
+		mov [status],0
 		call IMPRIME_SCORE
 		call IMPRIME_HISCORE
 		call IMPRIME_SPEED
