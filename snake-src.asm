@@ -306,10 +306,6 @@ conversion_mouse:
 	test bx,0001h 		;Para revisar si el boton izquierdo del mouse fue presionado
 	jz mouse 			;Si el boton izquierdo no fue presionado, vuelve a leer el estado del mouse
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;Aqui va la lógica de la posicion del mouse;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 	;Si el mouse fue presionado en el renglon 11, 12 o 13
 	;se revisara si se presiono un boton de velocidad
 	cmp dx, 11
@@ -318,6 +314,15 @@ conversion_mouse:
 	je boton_speed
 	cmp dx, 13
 	je boton_speed
+
+	;Si el mouse fue presionado en el renglon 19, 20 o 21
+	;se revisara si se presiono un boton de control
+	cmp dx, 19
+	je boton_controles
+	cmp dx, 20
+	je boton_controles
+	cmp dx, 21
+	je boton_controles
 
 	;Si el mouse fue presionado en el renglon 0
 	;se va a revisar si fue dentro del boton [X]
@@ -366,6 +371,35 @@ boton_speed_up:
 	call IMPRIME_SPEED
 
 	jmp mouse_no_clic
+
+;Verificamos que botón fue el presionado de los 3 posibles
+boton_controles:
+	cmp cx, 3d
+	je boton_pausa
+	cmp cx, 4d
+	je boton_pausa
+	cmp cx, 5d
+	je boton_pausa
+
+	cmp cx, 9d
+	je boton_reiniciar
+	cmp cx, 10d
+	je boton_reiniciar
+	cmp cx, 11d
+	je boton_reiniciar
+
+	cmp cx, 15d
+	je boton_play
+	cmp cx, 16d
+	je boton_play
+	cmp cx, 17d
+	je boton_play
+
+boton_pausa:
+
+boton_reiniciar:
+
+boton_play:
 
 boton_x:
 	jmp boton_x1
