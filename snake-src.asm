@@ -277,6 +277,7 @@ imprime_ui:
 ;Si el botón no está suelto, no continúa
 mouse_no_clic:
 	lee_mouse
+
 	test bx,0001h
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
@@ -285,6 +286,9 @@ mouse:
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
+	cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
+	ja restringir	;Si se cumple lo anterior, saltamos a la restricción del mouse
+
 	mov ax,dx 			;Copia DX en AX. DX es un valor entre 0 y 199 (renglon)
 	div [ocho] 			;Division de 8 bits
 						;divide el valor del renglon en resolucion 640x200 en donde se encuentra el mouse
@@ -311,6 +315,11 @@ conversion_mouse:
 	je boton_x
 
 	jmp mouse_no_clic
+
+restringir:
+	posiciona_cursor_mouse 160d, dx		;Como el mouse salio del area permitida, lo regresamos a la última columna permitida en su mismo renglon
+	jmp mouse_no_clic 	;Volvemos a leer la posición del mouse
+
 boton_x:
 	jmp boton_x1
 
@@ -346,19 +355,19 @@ salir:				;inicia etiqueta salir
 	DIBUJA_UI proc
 		;imprimir esquina superior izquierda del marco
 		posiciona_cursor 0,0
-		imprime_caracter_color marcoEsqSupIzq,cAmarillo,bgNegro
+		imprime_caracter_color marcoEsqSupIzq,cMagentaClaro,bgNegro
 		
 		;imprimir esquina superior derecha del marco
 		posiciona_cursor 0,79
-		imprime_caracter_color marcoEsqSupDer,cAmarillo,bgNegro
+		imprime_caracter_color marcoEsqSupDer,cMagentaClaro,bgNegro
 		
 		;imprimir esquina inferior izquierda del marco
 		posiciona_cursor 24,0
-		imprime_caracter_color marcoEsqInfIzq,cAmarillo,bgNegro
+		imprime_caracter_color marcoEsqInfIzq,cMagentaClaro,bgNegro
 		
 		;imprimir esquina inferior derecha del marco
 		posiciona_cursor 24,79
-		imprime_caracter_color marcoEsqInfDer,cAmarillo,bgNegro
+		imprime_caracter_color marcoEsqInfDer,cMagentaClaro,bgNegro
 		
 		;imprimir marcos horizontales, superior e inferior
 		mov cx,78 		;CX = 004Eh => CH = 00h, CL = 4Eh 
@@ -366,10 +375,10 @@ salir:				;inicia etiqueta salir
 		mov [col_aux],cl
 		;Superior
 		posiciona_cursor 0,[col_aux]
-		imprime_caracter_color marcoHor,cAmarillo,bgNegro
+		imprime_caracter_color marcoHor,cMagentaClaro,bgNegro
 		;Inferior
 		posiciona_cursor 24,[col_aux]
-		imprime_caracter_color marcoHor,cAmarillo,bgNegro
+		imprime_caracter_color marcoHor,cMagentaClaro,bgNegro
 		mov cl,[col_aux]
 		loop marcos_horizontales
 
@@ -379,13 +388,13 @@ salir:				;inicia etiqueta salir
 		mov [ren_aux],cl
 		;Izquierdo
 		posiciona_cursor [ren_aux],0
-		imprime_caracter_color marcoVer,cAmarillo,bgNegro
+		imprime_caracter_color marcoVer,cMagentaClaro,bgNegro
 		;Inferior
 		posiciona_cursor [ren_aux],79
-		imprime_caracter_color marcoVer,cAmarillo,bgNegro
+		imprime_caracter_color marcoVer,cMagentaClaro,bgNegro
 		;Interno
 		posiciona_cursor [ren_aux],area_controles_ancho
-		imprime_caracter_color marcoVer,cAmarillo,bgNegro
+		imprime_caracter_color marcoVer,cMagentaClaro,bgNegro
 		
 		mov cl,[ren_aux]
 		loop marcos_verticales
@@ -396,42 +405,42 @@ salir:				;inicia etiqueta salir
 		mov [col_aux],cl
 		;Interno izquierdo (marcador player 1)
 		posiciona_cursor 8,[col_aux]
-		imprime_caracter_color marcoHor,cAmarillo,bgNegro
+		imprime_caracter_color marcoHor,cMagentaClaro,bgNegro
 
 		;Interno derecho (marcador player 2)
 		posiciona_cursor 16,[col_aux]
-		imprime_caracter_color marcoHor,cAmarillo,bgNegro
+		imprime_caracter_color marcoHor,cMagentaClaro,bgNegro
 
 		mov cl,[col_aux]
 		loop marcos_horizontales_internos
 
 		;imprime intersecciones internas	
 		posiciona_cursor 0,area_controles_ancho
-		imprime_caracter_color marcoCruceVerSup,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceVerSup,cMagentaClaro,bgNegro
 		posiciona_cursor 24,area_controles_ancho
-		imprime_caracter_color marcoCruceVerInf,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceVerInf,cMagentaClaro,bgNegro
 
 		posiciona_cursor 8,0
-		imprime_caracter_color marcoCruceHorIzq,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceHorIzq,cMagentaClaro,bgNegro
 		posiciona_cursor 8,area_controles_ancho
-		imprime_caracter_color marcoCruceHorDer,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceHorDer,cMagentaClaro,bgNegro
 
 		posiciona_cursor 16,0
-		imprime_caracter_color marcoCruceHorIzq,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceHorIzq,cMagentaClaro,bgNegro
 		posiciona_cursor 16,area_controles_ancho
-		imprime_caracter_color marcoCruceHorDer,cAmarillo,bgNegro
+		imprime_caracter_color marcoCruceHorDer,cMagentaClaro,bgNegro
 
 		;imprimir [X] para cerrar programa
 		posiciona_cursor 0,17
-		imprime_caracter_color '[',cAmarillo,bgNegro
+		imprime_caracter_color '[',cMagentaClaro,bgNegro
 		posiciona_cursor 0,18
 		imprime_caracter_color 'X',cRojoClaro,bgNegro
 		posiciona_cursor 0,19
-		imprime_caracter_color ']',cAmarillo,bgNegro
+		imprime_caracter_color ']',cMagentaClaro,bgNegro
 
 		;imprimir título
 		posiciona_cursor 0,38
-		imprime_cadena_color [nameStr],5,cAmarillo,bgNegro
+		imprime_cadena_color [nameStr],5,cMagentaClaro,bgNegro
 
 		call IMPRIME_DATOS_INICIALES
 		ret
@@ -472,35 +481,35 @@ salir:				;inicia etiqueta salir
 
 		;Botón Speed down
 		mov [boton_caracter],31 		;▼
-		mov [boton_color],bgAmarillo
+		mov [boton_color],bgCyanClaro
 		mov [boton_renglon],11
 		mov [boton_columna],12
 		call IMPRIME_BOTON
 
 		;Botón Speed UP
 		mov [boton_caracter],30 		;▲
-		mov [boton_color],bgAmarillo
+		mov [boton_color],bgCyanClaro
 		mov [boton_renglon],11
 		mov [boton_columna],16
 		call IMPRIME_BOTON
 
 		;Botón Pause
 		mov [boton_caracter],186 		;║
-		mov [boton_color],bgAmarillo
+		mov [boton_color],bgCyanClaro
 		mov [boton_renglon],19
 		mov [boton_columna],3
 		call IMPRIME_BOTON
 
 		;Botón Stop
 		mov [boton_caracter],254d 		;■
-		mov [boton_color],bgAmarillo
+		mov [boton_color],bgCyanClaro
 		mov [boton_renglon],19
 		mov [boton_columna],9
 		call IMPRIME_BOTON
 
 		;Botón Start
 		mov [boton_caracter],16d 		;►
-		mov [boton_color],bgAmarillo
+		mov [boton_color],bgCyanClaro
 		mov [boton_renglon],19
 		mov [boton_columna],15
 		call IMPRIME_BOTON
@@ -611,7 +620,7 @@ salir:				;inicia etiqueta salir
 		shr dx,5
 		mov [col_aux],dl
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 2,cCyanClaro,bgNegro
+		imprime_caracter_color 2,cCyan,bgNegro
 		ret
 	endp
 
