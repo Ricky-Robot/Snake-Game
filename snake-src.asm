@@ -276,7 +276,15 @@ imprime_ui:
 ;Revisar que el boton izquierdo del mouse no esté presionado
 ;Si el botón no está suelto, no continúa
 mouse_no_clic:
+	;VERIFICAR STATUS
+	cmp [status], 1
+	; je movimiento
+	;REALIZAR MOVIMIENTO SI STATUS ES 1
+	
 	lee_mouse
+
+	cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
+	ja restringir	;Si se cumple lo anterior, saltamos a la restricción del mouse
 
 	test bx,0001h
 	jnz mouse_no_clic
