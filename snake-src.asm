@@ -68,7 +68,7 @@ col_aux  		db 		0
 ren_aux 		db 		0
 
 conta 			db 		0 		;contador auxiliar
-tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
+tick_ms			dw 		0 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
 mil				dw		1000 	;dato de valor decimal 1000 para operación DIV entre 1000
 diez 			dw 		10  	;dato de valor decimal 10 para operación DIV entre 10
 sesenta			db 		60 		;dato de valor decimal 60 para operación DIV entre 60
@@ -79,9 +79,9 @@ score 			dw 		0
 hi_score	 	dw 		0
 speed 			db 		1
 
-;Variable 'head' de 16 bits. Datos de la cabeza de la serpiente
-;Valor inicial: 00 00 0010111 01100b
-head 			db 		12d,23d
+;Variable 'head' de 2 bytes, primer byte renglon, segundo columna
+						;renglon    ;columna
+head 			db 		12d,        23d
 ;Bits 0-4: Posición del renglón (0-24d)
 ;Bits 5-11: Posición de la columna (0-79d)
 ;Bits 12-13: Dirección del siguiente movimiento
@@ -98,6 +98,12 @@ head 			db 		12d,23d
 ;El primer elemento del arreglo 'tail' es el extremo de la cola, el siguiente es el más cercano a la cola, y así sucesivamente.
 tail 			db 		12d, 22d, 12d, 21d,2710 dup(0)
 tail_conta 		dw 		2  	;contador para la longitud de la cola
+direccion  		db 		3d 	;direccion hacia la que se movera la serpiente en su siguiente iteracion
+						 	;0 = 'A' = izquierda
+						 	;1 = 'W' = arriba
+						 	;2 = 'S' = abajo
+						 	;3 = 'D' = derecha
+
 
 ;variables para las coordenadas del objeto actual en pantalla
 item_col 		db 		50  	;columna
@@ -114,6 +120,8 @@ boton_bg_color	db 		0 		;color del fondo del boton
 ocho			db 		8
 ;Cuando el driver del mouse no esta disponible
 no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
+
+dos 			db 		2 		;Variable con valor de  dos para multiplicaciones
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -251,6 +259,16 @@ comprueba_mouse 	macro
 	int 33h			;llama interrupcion 33h para manejo del mouse, devuelve un valor en AX
 					;Si AX = 0000h, no existe el driver. Si AX = FFFFh, existe driver
 endm
+
+verificar_teclado 	macro
+	mov ax, 0100h   ;Opcion 01h de la interrupcion 16h
+	int 16h
+endm
+
+leer_teclado   macro
+	mov ax, 0000h  	;Opcion 00h de la interrupción 16h
+	int 16h
+endm
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -276,11 +294,8 @@ imprime_ui:
 ;Revisar que el boton izquierdo del mouse no esté presionado
 ;Si el botón no está suelto, no continúa
 mouse_no_clic:
-	;VERIFICAR STATUS
-	cmp [status], 1
-	; je movimiento
-	;REALIZAR MOVIMIENTO SI STATUS ES 1
-	
+	cmp [status], 1d
+	je movimiento_condicion
 	lee_mouse
 
 	cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
@@ -288,6 +303,20 @@ mouse_no_clic:
 
 	test bx,0001h
 	jnz mouse_no_clic
+	jmp mouse
+
+;Entramos en la condición de que el status esta en modo play, por lo que realizamos el movimiento
+movimiento_condicion:
+	loop_movimiento:
+		;UTILIZAR INT 1AH PARA CALCULAR EL TIEMPO
+		add [tick_ms], 55
+		cmp [tick_ms], 2200
+		jae fin_loop_movimiento
+	fin_loop_movimiento:
+
+	call MOVIMIENTO
+	jmp mouse_no_clic
+
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
 	lee_mouse
@@ -417,6 +446,35 @@ boton_pausa:
 
 ;Si el botón presionado fue reiniciar, se realiza lo siguiente
 boton_reiniciar:
+	;Reiniciamos los valores del Player
+	mov [head], 12d
+	mov [head+1], 23d
+
+	mov [tail], 12d
+	mov [tail+1], 22d
+
+	mov [tail+2], 12d
+	mov [tail+3], 21d
+
+	;Inicializamos contadores para ciclar
+	mov di, 4
+	mov bx, 5
+	;Reiniciamos los valores para el nuevo juego
+	loop_reiniciar:
+		cmp [tail + di], 0
+		je finloop
+		cmp [tail + bx], 0
+		je finloop
+
+		mov [tail + di], 0
+		mov [tail + bx], 0
+
+		add di, 2
+		add bx, 2
+
+		jmp loop_reiniciar
+	finloop:
+	
 	call IMPRIME_DATOS_INICIALES 	;Se reinician los valores a los datos iniciales y se vuelven a dibujar en pantalla
 
 	jmp mouse_no_clic  	;Volvemos a verificar el estado del mouse
@@ -555,8 +613,8 @@ salir:				;inicia etiqueta salir
 	;Reinicia scores y speed, e imprime
 	DATOS_INICIALES proc
 		mov [score],0
-		mov [hi_score],0
 		mov [speed],1
+		mov [hi_score], 0
 		mov [status],0
 		call IMPRIME_SCORE
 		call IMPRIME_HISCORE
@@ -764,8 +822,49 @@ salir:				;inicia etiqueta salir
 
 	;Borra la serpiente para reimprimirla en una posición actualizada
 	BORRA_PLAYER proc
-		;;;;;Completar =);;;;
+		call BORRA_HEAD
+		call BORRA_TAIL
 		ret
+	endp
+
+	BORRA_HEAD proc
+		mov al,[head]
+		mov [ren_aux],al
+		mov al, [head+1]
+		mov [col_aux],al
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 2d,cNegro,bgNegro
+		ret
+	endp
+
+	BORRA_TAIL proc
+		mov di, 0
+		mov bx, 1
+	loop_tail_borrar:
+		mov dl, [tail + di]  ;Renglon
+		mov cl, [tail + bx]  ;Columna
+
+		cmp dl, 0
+		je salida_loop_tail_borrar
+		cmp cl, 0
+		je salida_loop_tail_borrar
+
+		mov [ren_aux], dl  ;Movemos el renglon
+		mov [col_aux], cl  ;Movemos la columna
+
+		add di, 2d
+		add bx, 2d
+
+		push bx
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 254d,cNegro,bgNegro
+		pop bx
+
+		jmp loop_tail_borrar
+
+		salida_loop_tail_borrar:
+
+		ret 
 	endp
 
 	;procedimiento IMPRIME_BOTON
@@ -799,6 +898,167 @@ salir:				;inicia etiqueta salir
 		imprime_caracter_color [boton_caracter],cRojo,[boton_color]
 	 	ret 			;Regreso de llamada a procedimiento
 	endp	 			;Indica fin de procedimiento UI para el ensamblador
+
+	MOVIMIENTO proc
+		call BORRA_PLAYER
+		verificar_teclado
+		jz movimiento_posiciones
+
+		leer_teclado  	;Leemos el teclado 
+
+		cmp al, 'A'
+		je dir_izquierda
+		cmp al, 'a'
+		je dir_izquierda
+
+		cmp al, 'W'
+		je dir_arriba
+		cmp al, 'w'
+		je dir_arriba
+
+		cmp al, 'S'
+		je dir_abajo
+		cmp al, 's'
+		je dir_abajo
+
+		cmp al, 'D'
+		je dir_derecha
+		cmp al, 'd'
+		je dir_derecha
+
+		dir_izquierda:
+			cmp [direccion], 3d 	;Verificamos si se dirigia hacia la derecha
+			je dir_derecha 	;si es igual sigue su camino hacia la derecha
+
+			mov [direccion], 0d 	;Cambiamos la direccion a la izquierda
+			jmp movimiento_posiciones
+
+		dir_arriba:
+			cmp [direccion], 2d   ;Verificamos si se dirigia hacia abajo
+			je dir_abajo	;si es igual sigue su camino
+
+			mov [direccion], 1d 	;Cambiamos la direccion hacia arriba
+			jmp movimiento_posiciones
+
+		dir_abajo:
+			cmp [direccion], 2d   ;Verificamos si se dirigia hacia arriba
+			je dir_abajo	;si es igual sigue su camino
+
+			mov [direccion], 2d 	;Cambiamos la direccion hacia abajo
+			jmp movimiento_posiciones
+
+		dir_derecha:
+			cmp [direccion], 0d 	;Verificamos si se dirigia hacia la izquierda
+			je dir_derecha 	;si es igual sigue su camino hacia la izquierda
+
+			mov [direccion], 3d 	;Cambiamos la direccion hacia la derecha
+			jmp movimiento_posiciones
+
+		;Realizamos el movimiento correspondiente a la direccion
+		movimiento_posiciones:
+			mov dl, [head] 		;Guardamos el renglon de la cabeza
+			mov cl, [head+1] 	;Guardamos la columna de la cabeza
+
+			;Comprobamos la última dirección ingresada
+			cmp [direccion], 0d
+			je mov_izquierda
+
+			cmp [direccion], 1d
+			je mov_arriba
+
+			cmp [direccion], 2d
+			je mov_abajo
+
+			cmp [direccion], 3d
+			je mov_derecha
+
+			;Avanzamos hacia la izquierda
+			mov_izquierda:
+				;Movemos la cabeza
+				dec cl
+
+				cmp cl, 20d
+				je game_over
+
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], cl
+
+				mov di, 0
+				mov bx, 1
+				loop_izquierda:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je actualizar_snake
+					jmp loop_izquierda
+
+			;Avanzamos hacia arriba
+			mov_arriba:
+
+			;Avanzamos hacia abajo
+			mov_abajo:
+
+			;Avanzamos hacia la derecha
+			mov_derecha:
+				;Movemos la cabeza
+				inc cl
+
+				cmp cl, 79d
+				je game_over
+
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], cl
+
+				mov di, 0
+				mov bx, 1
+				loop_derecha:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je actualizar_snake
+					jmp loop_derecha
+
+			game_over:
+				mov [status], 0
+				call BORRA_PLAYER
+				;BORRAR JUGADOR AL FINALIZAR EL JUEGO
+			
+			;Actualizamos la serpiente en pantalla, redibujandola
+			actualizar_snake:
+				call IMPRIME_PLAYER
+
+		ret
+	endp
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
