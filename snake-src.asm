@@ -81,7 +81,7 @@ speed 			db 		1
 
 ;Variable 'head' de 16 bits. Datos de la cabeza de la serpiente
 ;Valor inicial: 00 00 0010111 01100b
-head 			dw 		0000001011101100b
+head 			db 		12d,23d
 ;Bits 0-4: Posición del renglón (0-24d)
 ;Bits 5-11: Posición de la columna (0-79d)
 ;Bits 12-13: Dirección del siguiente movimiento
@@ -278,7 +278,7 @@ imprime_ui:
 mouse_no_clic:
 	;VERIFICAR STATUS
 	cmp [status], 1
-	; je movimiento
+	je movimiento_condicion
 	;REALIZAR MOVIMIENTO SI STATUS ES 1
 	
 	lee_mouse
@@ -289,6 +289,12 @@ mouse_no_clic:
 	test bx,0001h
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
+
+;Realizamos la llamada al procedimiento que se encarga del movimiento de la serpiente
+movimiento_condicion:
+	call MOVIMIENTO
+	jmp mouse_no_clic
+
 mouse:
 	lee_mouse
 conversion_mouse:
@@ -555,7 +561,6 @@ salir:				;inicia etiqueta salir
 	;Reinicia scores y speed, e imprime
 	DATOS_INICIALES proc
 		mov [score],0
-		mov [hi_score],0
 		mov [speed],1
 		mov [status],0
 		call IMPRIME_SCORE
@@ -719,13 +724,10 @@ salir:				;inicia etiqueta salir
 
 	;Imprime la cabeza de la serpiente
 	IMPRIME_HEAD proc
-		mov ax,[head]
-		mov dx,ax
-		and ax,11111b
+		mov al,[head]
 		mov [ren_aux],al
-		and dx,111111100000b
-		shr dx,5
-		mov [col_aux],dl
+		mov al, [head+1]
+		mov [col_aux],al
 		posiciona_cursor [ren_aux],[col_aux]
 		imprime_caracter_color 2,cCyan,bgNegro
 		ret
@@ -792,6 +794,10 @@ salir:				;inicia etiqueta salir
 		imprime_caracter_color [boton_caracter],cRojo,[boton_color]
 	 	ret 			;Regreso de llamada a procedimiento
 	endp	 			;Indica fin de procedimiento UI para el ensamblador
+
+	MOVIMIENTO proc
+		
+	endp
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
