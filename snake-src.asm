@@ -81,7 +81,7 @@ speed 			db 		1
 
 ;Variable 'head' de 16 bits. Datos de la cabeza de la serpiente
 ;Valor inicial: 00 00 0010111 01100b
-head 			dw 		0000001011101100b
+head 			db 		12d,23d
 ;Bits 0-4: Posición del renglón (0-24d)
 ;Bits 5-11: Posición de la columna (0-79d)
 ;Bits 12-13: Dirección del siguiente movimiento
@@ -96,7 +96,7 @@ head 			dw 		0000001011101100b
 ;los primeros dos valores son fijos y se imprimen al inicio del juego
 ;el resto se deben calcular conforme avanza el juego
 ;El primer elemento del arreglo 'tail' es el extremo de la cola, el siguiente es el más cercano a la cola, y así sucesivamente.
-tail 			dw 		0000001010101100b,0000001011001100b,1355 dup(0)
+tail 			db 		12d, 22d, 12d, 21d,2710 dup(0)
 tail_conta 		dw 		2  	;contador para la longitud de la cola
 
 ;variables para las coordenadas del objeto actual en pantalla
@@ -719,13 +719,10 @@ salir:				;inicia etiqueta salir
 
 	;Imprime la cabeza de la serpiente
 	IMPRIME_HEAD proc
-		mov ax,[head]
-		mov dx,ax
-		and ax,11111b
+		mov al,[head]
 		mov [ren_aux],al
-		and dx,111111100000b
-		shr dx,5
-		mov [col_aux],dl
+		mov al, [head+1]
+		mov [col_aux],al
 		posiciona_cursor [ren_aux],[col_aux]
 		imprime_caracter_color 2,cCyan,bgNegro
 		ret
@@ -736,22 +733,32 @@ salir:				;inicia etiqueta salir
 	;Los valores establecidos en 0 son espacios reservados para el resto de los elementos.
 	;Se imprimen todos los elementos iniciando en el primero, hasta que se encuentre un 0 
 	IMPRIME_TAIL proc
-		lea bx,[tail]
+		mov di, 0
+		mov bx, 1
 	loop_tail:
+		mov dl, [tail + di]  ;Renglon
+		mov cl, [tail + bx]  ;Columna
+
+		cmp dl, 0
+		je salida_loop_tail
+		cmp cl, 0
+		je salida_loop_tail
+
+		mov [ren_aux], dl  ;Movemos el renglon
+		mov [col_aux], cl  ;Movemos la columna
+
+		add di, 2d
+		add bx, 2d
+
 		push bx
-		mov ax,[bx]
-		mov dx,ax
-		and ax,11111b
-		mov [ren_aux],al
-		and dx,111111100000b
-		shr dx,5
-		mov [col_aux],dl
 		posiciona_cursor [ren_aux],[col_aux]
 		imprime_caracter_color 254,cCyanClaro,bgNegro
 		pop bx
-		add bx,2
-		cmp word ptr [bx],0
-		jne loop_tail
+
+		jmp loop_tail
+
+		salida_loop_tail:
+
 		ret 
 	endp
 
