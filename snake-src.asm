@@ -68,11 +68,14 @@ col_aux  		db 		0
 ren_aux 		db 		0
 
 conta 			db 		0 		;contador auxiliar
-tick_ms			dw 		0 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
+tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
 mil				dw		1000 	;dato de valor decimal 1000 para operación DIV entre 1000
 diez 			dw 		10  	;dato de valor decimal 10 para operación DIV entre 10
 sesenta			db 		60 		;dato de valor decimal 60 para operación DIV entre 60
 status 			db 		0 		;0 stop-pause, 1 activo
+tiempo_i 		dw 		0 		;Variable auxiliar para el tiempo inicial
+tiempo_f		dw 		0 		;Variable auxiliar para el tiempo final
+
 
 ;Variables para el juego
 score 			dw 		0
@@ -122,6 +125,8 @@ ocho			db 		8
 no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
 
 dos 			db 		2 		;Variable con valor de  dos para multiplicaciones
+
+WAIT_TIME  		dw  	2 		
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -294,32 +299,40 @@ imprime_ui:
 ;Revisar que el boton izquierdo del mouse no esté presionado
 ;Si el botón no está suelto, no continúa
 mouse_no_clic:
-	cmp [status], 1d
-	je movimiento_condicion
 	lee_mouse
 
 	cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
 	ja restringir	;Si se cumple lo anterior, saltamos a la restricción del mouse
 
 	test bx,0001h
-	jnz mouse_no_clic
+	jne mouse_no_clic
 	jmp mouse
-
-;Entramos en la condición de que el status esta en modo play, por lo que realizamos el movimiento
-movimiento_condicion:
-	loop_movimiento:
-		;UTILIZAR INT 1AH PARA CALCULAR EL TIEMPO
-		add [tick_ms], 55
-		cmp [tick_ms], 2200
-		jae fin_loop_movimiento
-	fin_loop_movimiento:
-
-	call MOVIMIENTO
-	jmp mouse_no_clic
 
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
+	cmp [status], 1d
+	je movimiento_condicion
+	continuacion_movimiento:
 	lee_mouse
+	jmp conversion_mouse
+
+;Entramos en la condición de que el status esta en modo play, por lo que realizamos el movimiento
+movimiento_condicion:
+	mov cx, 0d
+	mov dx, 0d
+
+	mov ax, 0100h   ;Opcion para leer el tiempo del sistema actual
+	int 1Ah 	;Interrupción encargada de las funciones del tiempo
+
+	TIMER:
+		MOV     AH, 00H
+		INT     1AH
+		CMP     DX,WAIT_TIME
+		JB      TIMER
+
+	call MOVIMIENTO
+	jmp continuacion_movimiento
+
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
@@ -366,14 +379,18 @@ conversion_mouse:
 	cmp dx,0
 	je boton_x
 
-	jmp mouse_no_clic
+	jmp mouse
 
 restringir:
 	posiciona_cursor_mouse 160d, dx		;Como el mouse salio del area permitida, lo regresamos a la última columna permitida en su mismo renglon
-	jmp mouse_no_clic 	;Volvemos a leer la posición del mouse
+	jmp mouse 	;Volvemos a leer la posición del mouse
 
 ;Se realizan las comparaciones para ver que botón fue el presionado
 boton_speed:
+	;Si el estado esta en modo play, no se puede modificar la velocidad
+	cmp [status], 1
+	je mouse 
+
 	cmp cx, 12d
 	je boton_speed_down
 	cmp cx, 13d
@@ -400,6 +417,7 @@ boton_speed_down:
 	call IMPRIME_SPEED
 
 	jmp mouse_no_clic
+
 ;Se encarga de subir el valor de la velocidad, no puede ser mayor que 99
 boton_speed_up:
 	cmp [speed], 99d
@@ -446,35 +464,8 @@ boton_pausa:
 
 ;Si el botón presionado fue reiniciar, se realiza lo siguiente
 boton_reiniciar:
-	;Reiniciamos los valores del Player
-	mov [head], 12d
-	mov [head+1], 23d
+	call BORRA_PLAYER 	;Borramos el jugador antes de reiniciar
 
-	mov [tail], 12d
-	mov [tail+1], 22d
-
-	mov [tail+2], 12d
-	mov [tail+3], 21d
-
-	;Inicializamos contadores para ciclar
-	mov di, 4
-	mov bx, 5
-	;Reiniciamos los valores para el nuevo juego
-	loop_reiniciar:
-		cmp [tail + di], 0
-		je finloop
-		cmp [tail + bx], 0
-		je finloop
-
-		mov [tail + di], 0
-		mov [tail + bx], 0
-
-		add di, 2
-		add bx, 2
-
-		jmp loop_reiniciar
-	finloop:
-	
 	call IMPRIME_DATOS_INICIALES 	;Se reinician los valores a los datos iniciales y se vuelven a dibujar en pantalla
 
 	jmp mouse_no_clic  	;Volvemos a verificar el estado del mouse
@@ -482,7 +473,7 @@ boton_reiniciar:
 ;Si el botón presionado fue play, se realiza lo siguiente
 boton_play:
 	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
-	jmp mouse_no_clic
+	jmp mouse
 
 boton_x:
 	jmp boton_x1
@@ -612,9 +603,37 @@ salir:				;inicia etiqueta salir
 
 	;Reinicia scores y speed, e imprime
 	DATOS_INICIALES proc
+		;Reiniciamos los valores del Player
+		mov [head], 12d
+		mov [head+1], 23d
+
+		mov [tail], 12d
+		mov [tail+1], 22d
+
+		mov [tail+2], 12d
+		mov [tail+3], 21d
+
+		;Inicializamos contadores para ciclar
+		mov di, 4
+		mov bx, 5
+		;Reiniciamos los valores para el nuevo juego
+		loop_reiniciar:
+			cmp [tail + di], 0
+			je finloop
+			cmp [tail + bx], 0
+			je finloop
+
+			mov [tail + di], 0
+			mov [tail + bx], 0
+
+			add di, 2
+			add bx, 2
+
+			jmp loop_reiniciar
+		finloop:
+		
 		mov [score],0
 		mov [speed],1
-		mov [hi_score], 0
 		mov [status],0
 		call IMPRIME_SCORE
 		call IMPRIME_HISCORE
@@ -781,8 +800,10 @@ salir:				;inicia etiqueta salir
 		mov [ren_aux],al
 		mov al, [head+1]
 		mov [col_aux],al
+		push bx
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 2,cCyan,bgNegro
+		imprime_caracter_color 15,cCyan,bgNegro
+		pop bx
 		ret
 	endp
 
@@ -810,7 +831,7 @@ salir:				;inicia etiqueta salir
 
 		push bx
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 254,cCyanClaro,bgNegro
+		imprime_caracter_color 7,cCyanClaro,bgNegro
 		pop bx
 
 		jmp loop_tail
@@ -833,7 +854,7 @@ salir:				;inicia etiqueta salir
 		mov al, [head+1]
 		mov [col_aux],al
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 2d,cNegro,bgNegro
+		imprime_caracter_color 32d,cNegro,bgNegro
 		ret
 	endp
 
@@ -857,7 +878,7 @@ salir:				;inicia etiqueta salir
 
 		push bx
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 254d,cNegro,bgNegro
+		imprime_caracter_color 32d,cNegro,bgNegro
 		pop bx
 
 		jmp loop_tail_borrar
@@ -941,15 +962,15 @@ salir:				;inicia etiqueta salir
 			jmp movimiento_posiciones
 
 		dir_abajo:
-			cmp [direccion], 2d   ;Verificamos si se dirigia hacia arriba
-			je dir_abajo	;si es igual sigue su camino
+			cmp [direccion], 1d   ;Verificamos si se dirigia hacia arriba
+			je dir_arriba	;si es igual sigue su camino
 
 			mov [direccion], 2d 	;Cambiamos la direccion hacia abajo
 			jmp movimiento_posiciones
 
 		dir_derecha:
 			cmp [direccion], 0d 	;Verificamos si se dirigia hacia la izquierda
-			je dir_derecha 	;si es igual sigue su camino hacia la izquierda
+			je dir_izquierda 	;si es igual sigue su camino hacia la izquierda
 
 			mov [direccion], 3d 	;Cambiamos la direccion hacia la derecha
 			jmp movimiento_posiciones
@@ -975,13 +996,17 @@ salir:				;inicia etiqueta salir
 			;Avanzamos hacia la izquierda
 			mov_izquierda:
 				;Movemos la cabeza
-				dec cl
-
-				cmp cl, 20d
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, cl
+				dec al
+				cmp al, 20d
 				je game_over
-
 				;Movemos a la cabeza su nueva posición
-				mov [head+1], cl
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
 
 				mov di, 0
 				mov bx, 1
@@ -1009,24 +1034,22 @@ salir:				;inicia etiqueta salir
 
 			;Avanzamos hacia arriba
 			mov_arriba:
-
-			;Avanzamos hacia abajo
-			mov_abajo:
-
-			;Avanzamos hacia la derecha
-			mov_derecha:
 				;Movemos la cabeza
-				inc cl
-
-				cmp cl, 79d
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				dec al
+				cmp al, 0d
 				je game_over
-
 				;Movemos a la cabeza su nueva posición
+				mov [head], al
 				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
 
 				mov di, 0
 				mov bx, 1
-				loop_derecha:
+				loop_arriba:
 					;Guardamos una referencia al valor de la cola posterior
 					push word ptr [tail+di]
 					push word ptr [tail+bx]
@@ -1046,17 +1069,107 @@ salir:				;inicia etiqueta salir
 
 					cmp di, ax
 					je actualizar_snake
+					jmp loop_arriba
+
+			;Avanzamos hacia abajo
+			mov_abajo:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				inc al
+				cmp al, 24d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head], al
+				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_abajo:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je actualizar_snake
+					jmp loop_abajo
+
+			;Avanzamos hacia la derecha
+			mov_derecha:
+				;Movemos la cabeza hacia la derecha
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+
+				mov al, cl
+				inc al
+				;Verificamos las colisiones con la pared de la derecha
+				cmp al, 79d
+				je game_over
+
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				;Inicializamos contadores para recorrer el arreglo de la cola
+				mov di, 0
+				mov bx, 1
+				loop_derecha:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					;Pasamos a las siguientes coordenadas del arreglo de la cola
+					add di, 2d
+					add bx, 2d
+
+					;Almacenamos las referencias que habiamos guardado de los valores anteriores
+					pop cx
+					pop dx
+
+					;Utilizamos el contador de elementos en la cola/cuerpo de la serpiente para saber si llegamos al final
+					mov ax, [tail_conta]
+					mul [dos]
+
+					;Comparamos la última posición iterada con el total de elementos de la cola
+					cmp di, ax
+					je actualizar_snake
+
+					;Repetimos todo el proceso si no hemos llegado al final
 					jmp loop_derecha
 
 			game_over:
 				mov [status], 0
 				call BORRA_PLAYER
+				call IMPRIME_DATOS_INICIALES
+				jmp fin_movimiento
 				;BORRAR JUGADOR AL FINALIZAR EL JUEGO
 			
 			;Actualizamos la serpiente en pantalla, redibujandola
 			actualizar_snake:
 				call IMPRIME_PLAYER
 
+			fin_movimiento:
 		ret
 	endp
 	
