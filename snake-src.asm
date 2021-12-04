@@ -274,6 +274,11 @@ leer_teclado   macro
 	mov ax, 0000h  	;Opcion 00h de la interrupción 16h
 	int 16h
 endm
+
+limpiar_buffer   macro
+ 	mov ax, 0C00h
+ 	int 21h
+endm
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -472,6 +477,9 @@ boton_reiniciar:
 
 ;Si el botón presionado fue play, se realiza lo siguiente
 boton_play:
+	;Limpiamos el buffer del teclado para no tomar en cuenta teclas en pausa
+	limpiar_buffer
+
 	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
 	jmp mouse
 
@@ -631,7 +639,7 @@ salir:				;inicia etiqueta salir
 
 			jmp loop_reiniciar
 		finloop:
-		
+
 		mov [score],0
 		mov [speed],1
 		mov [status],0
