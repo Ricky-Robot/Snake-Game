@@ -80,7 +80,7 @@ tiempo_f		dw 		0 		;Variable auxiliar para el tiempo final
 ;Variables para el juego
 score 			dw 		0
 hi_score	 	dw 		0
-speed 			db 		1
+speed 			db 		1d
 
 ;Variable 'head' de 2 bytes, primer byte renglon, segundo columna
 						;renglon    ;columna
@@ -109,8 +109,7 @@ direccion  		db 		3d 	;direccion hacia la que se movera la serpiente en su sigui
 
 
 ;variables para las coordenadas del objeto actual en pantalla
-item_col 		db 		50  	;columna
-item_ren 		db 		16 		;renglon
+item 			db 		16d,50d
 
 ;Variables que sirven de parametros para el procedimiento IMPRIME_BOTON
 boton_caracter 	db 		0 		;caracter a imprimir
@@ -126,7 +125,7 @@ no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
 
 dos 			db 		2 		;Variable con valor de  dos para multiplicaciones
 
-WAIT_TIME  		dw  	2 		
+WAIT_TIME  		dw  	13d
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -326,19 +325,26 @@ movimiento_condicion:
 	mov cx, 0d
 	mov dx, 0d
 
+	; mov bx,13d
+	; sub bl,[speed]
+	; mov [WAIT_TIME],bx
+
 	mov ax, 0100h   ;Opcion para leer el tiempo del sistema actual
 	int 1Ah 	;Interrupción encargada de las funciones del tiempo
-
-	TIMER:
-		MOV     AH, 00H
-		INT     1AH
-		CMP     DX,WAIT_TIME
-		JB      TIMER
+	timer:
+		mov    	ax, 0000h
+		int     1Ah
+		mov 	bh,00
+		mov 	bl,[speed]
+		sub		[WAIT_TIME],bx
+		cmp     dx,WAIT_TIME
+		jb      timer
 
 	call MOVIMIENTO
 	jmp continuacion_movimiento
 
 conversion_mouse:
+	lee_mouse
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
 	cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
@@ -425,7 +431,7 @@ boton_speed_down:
 
 ;Se encarga de subir el valor de la velocidad, no puede ser mayor que 99
 boton_speed_up:
-	cmp [speed], 99d
+	cmp [speed], 12d
 	je mouse_no_clic
 	mov al, [speed]
 	inc ax
@@ -766,9 +772,9 @@ salir:				;inicia etiqueta salir
 		mov [ren_aux],12
 		mov [col_aux],9
 		;Si speed es mayor o igual a 100, se limita a 99
-		cmp [speed],100d
+		cmp [speed],13d
 		jb continua
-		mov [speed],99d
+		mov [speed],12d
 	continua:
 		;posiciona el cursor en la posición a imprimir
 		posiciona_cursor [ren_aux],[col_aux]
@@ -797,7 +803,7 @@ salir:				;inicia etiqueta salir
 
 	;Imprime objeto en pantalla
 	IMPRIME_ITEM proc
-		posiciona_cursor [item_ren],[item_col]
+		posiciona_cursor [item],[item+1]
 		imprime_caracter_color 3,cVerdeClaro,bgNegro
 		ret
 	endp
@@ -1037,7 +1043,7 @@ salir:				;inicia etiqueta salir
 					mul [dos]
 
 					cmp di, ax
-					je actualizar_snake
+					je comida
 					jmp loop_izquierda
 
 			;Avanzamos hacia arriba
@@ -1076,7 +1082,7 @@ salir:				;inicia etiqueta salir
 					mul [dos]
 
 					cmp di, ax
-					je actualizar_snake
+					je comida
 					jmp loop_arriba
 
 			;Avanzamos hacia abajo
@@ -1115,7 +1121,7 @@ salir:				;inicia etiqueta salir
 					mul [dos]
 
 					cmp di, ax
-					je actualizar_snake
+					je comida
 					jmp loop_abajo
 
 			;Avanzamos hacia la derecha
@@ -1161,7 +1167,7 @@ salir:				;inicia etiqueta salir
 
 					;Comparamos la última posición iterada con el total de elementos de la cola
 					cmp di, ax
-					je actualizar_snake
+					je comida
 
 					;Repetimos todo el proceso si no hemos llegado al final
 					jmp loop_derecha
@@ -1172,10 +1178,75 @@ salir:				;inicia etiqueta salir
 				call IMPRIME_DATOS_INICIALES
 				jmp fin_movimiento
 				;BORRAR JUGADOR AL FINALIZAR EL JUEGO
-			
+			comida:
+			;Comparamos el renglon y la columna de la cabeza con la posicion del item 
+				push bx
+				xor bx,bx
+				mov bl,[head]
+				cmp bl,[item]
+				jne actualizar_snake
+				mov bl,[head+1]
+				cmp bl,[item+1]
+				jne	actualizar_snake
+				;Actrualizamos la score
+				mov bx,[score]
+				add bx,50d
+				mov [score],bx
+				actualizar_item:
+				;Generamos aleatoriamente la posicion del nuevo item
+					mov ax,2C00h 	;Esta opcion obtiene el tiempo del sistema 
+					int 21h
+
+					sub	dl,76d
+					mov [item],dl
+
+					mov ax,2C00h 	;Esta opcion obtiene el tiempo del sistema 
+					int 21h
+
+					add dl,21d
+					mov [item+1],dl
+
+				;Verificamos que la posicion aleatoria item esté dentro del campo de juego
+					mov bl,[item]
+					cmp bl, 0d
+					jbe actualizar_item
+					cmp bl, 24d
+					jae actualizar_item
+					mov bl,[item+1]
+					cmp bl, 20d
+					jbe actualizar_item
+					cmp bl,	79d
+					jae actualizar_item
+
+				;Verificamos que si hay colisiones con el cuerpo de la serpiente por medio de la serpiente
+					posiciona_cursor [item],[item+1]
+
+					mov ax,0800h
+					int 10h
+
+					cmp al,7d
+					je actualizar_item
+					cmp al,15d
+					je actualizar_item
+
+				;Comparamos la score actual con la hi score y decidimos si actualizar o no
+				mov bx,[hi_score]
+				cmp bx,[score]
+				jb  actualizar_hi_score
+
+				jmp actualizar_snake
+
+			actualizar_hi_score:
+				mov bx,[score]
+				mov [hi_score],bx
+				jmp actualizar_snake
 			;Actualizamos la serpiente en pantalla, redibujandola
 			actualizar_snake:
+				pop bx
 				call IMPRIME_PLAYER
+				call IMPRIME_SCORE
+				call IMPRIME_HISCORE
+				call IMPRIME_ITEM
 
 			fin_movimiento:
 		ret
