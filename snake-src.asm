@@ -125,7 +125,9 @@ no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
 
 dos 			db 		2 		;Variable con valor de  dos para multiplicaciones
 
-WAIT_TIME  		dw  	13d
+WAIT_TIME  		dw  	13d	;Variable que nos ayuda a controlar el tiempo de movimiento
+renglones		db 		23d  ;Valor que nos ayuda a dividir para evitar colisiones
+columnas		db 		78d  ;Valor que nos ayuda a dividir para evitar colisiones
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -322,18 +324,15 @@ mouse:
 
 ;Entramos en la condición de que el status esta en modo play, por lo que realizamos el movimiento
 movimiento_condicion:
-	mov cx, 0d
-	mov dx, 0d
 
-	; mov bx,13d
-	; sub bl,[speed]
-	; mov [WAIT_TIME],bx
-
-	mov ax, 0100h   ;Opcion para leer el tiempo del sistema actual
+	mov ax, 0000h   ;Opcion para leer el tiempo del sistema actual
 	int 1Ah 	;Interrupción encargada de las funciones del tiempo
+
+	mov [tiempo_i],dx
 	timer:
-		mov    	ax, 0000h
+		mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
 		int     1Ah
+		sub		dx,[tiempo_i]
 		mov 	bh,00
 		mov 	bl,[speed]
 		sub		[WAIT_TIME],bx
@@ -1194,40 +1193,37 @@ salir:				;inicia etiqueta salir
 				mov [score],bx
 				actualizar_item:
 				;Generamos aleatoriamente la posicion del nuevo item
-					mov ax,2C00h 	;Esta opcion obtiene el tiempo del sistema 
-					int 21h
+					mov ax,0000h	;Esta opcion obtiene el tiempo del sistema 
+					int 1Ah
+					;Usamos el modulo de 23 para evitar colisiones y ahorrarnos comparaciones
+					mov ax,0000h
+					mov al,dl
+					add al,dh
+					div al,[renglones]
+					add ah,1d
+					mov [item],ah
 
-					sub	dl,76d
-					mov [item],dl
+					mov ax,0000h 	;Esta opcion obtiene el tiempo del sistema 
+					int 1Ah
+					;Usamos el modulo de 78 para evitar colisiones y ahorrarnos comparaciones
+					mov ax,0000h
+					mov al,dl
+					add al,ah
+					div al,[columnas]
+					add ah,21d
+					mov [item],ah
 
-					mov ax,2C00h 	;Esta opcion obtiene el tiempo del sistema 
-					int 21h
-
-					add dl,21d
-					mov [item+1],dl
-
-				;Verificamos que la posicion aleatoria item esté dentro del campo de juego
-					mov bl,[item]
-					cmp bl, 0d
-					jbe actualizar_item
-					cmp bl, 24d
-					jae actualizar_item
-					mov bl,[item+1]
-					cmp bl, 20d
-					jbe actualizar_item
-					cmp bl,	79d
-					jae actualizar_item
-
-				;Verificamos que si hay colisiones con el cuerpo de la serpiente por medio de la serpiente
+					;Verificamos que si hay colisiones con el cuerpo de la serpiente por medio de la serpiente
 					posiciona_cursor [item],[item+1]
 
 					mov ax,0800h
 					int 10h
 
-					cmp al,7d
-					je actualizar_item
-					cmp al,15d
-					je actualizar_item
+					cmp al,0d
+					jne actualizar_item
+					; je actualizar_item
+					; cmp al,15d
+					; je actualizar_item
 
 				;Comparamos la score actual con la hi score y decidimos si actualizar o no
 				mov bx,[hi_score]
@@ -1244,9 +1240,9 @@ salir:				;inicia etiqueta salir
 			actualizar_snake:
 				pop bx
 				call IMPRIME_PLAYER
+				call IMPRIME_ITEM
 				call IMPRIME_SCORE
 				call IMPRIME_HISCORE
-				call IMPRIME_ITEM
 
 			fin_movimiento:
 		ret
