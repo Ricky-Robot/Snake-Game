@@ -803,7 +803,7 @@ salir:				;inicia etiqueta salir
 	;Imprime objeto en pantalla
 	IMPRIME_ITEM proc
 		posiciona_cursor [item],[item+1]
-		imprime_caracter_color 3,cVerdeClaro,bgNegro
+		imprime_caracter_color 2,cRojoClaro,bgNegro
 		ret
 	endp
 
@@ -1193,25 +1193,23 @@ salir:				;inicia etiqueta salir
 				mov [score],bx
 				actualizar_item:
 				;Generamos aleatoriamente la posicion del nuevo item
-					mov ax,0000h	;Esta opcion obtiene el tiempo del sistema 
+					mov ax,0200h	;Esta opcion obtiene el tiempo del sistema 
 					int 1Ah
 					;Usamos el modulo de 23 para evitar colisiones y ahorrarnos comparaciones
 					mov ax,0000h
-					mov al,dl
-					add al,dh
-					div al,[renglones]
+					mov al,dh
+					div [renglones]
 					add ah,1d
 					mov [item],ah
 
-					mov ax,0000h 	;Esta opcion obtiene el tiempo del sistema 
+					mov ax,0200h 	;Esta opcion obtiene el tiempo del sistema 
 					int 1Ah
 					;Usamos el modulo de 78 para evitar colisiones y ahorrarnos comparaciones
 					mov ax,0000h
-					mov al,dl
-					add al,ah
-					div al,[columnas]
+					mov al,dh
+					div [columnas]
 					add ah,21d
-					mov [item],ah
+					mov [item+1],ah
 
 					;Verificamos que si hay colisiones con el cuerpo de la serpiente por medio de la serpiente
 					posiciona_cursor [item],[item+1]
@@ -1219,11 +1217,10 @@ salir:				;inicia etiqueta salir
 					mov ax,0800h
 					int 10h
 
-					cmp al,0d
-					jne actualizar_item
-					; je actualizar_item
-					; cmp al,15d
-					; je actualizar_item
+					cmp al,15d
+					je actualizar_item
+					cmp al,7d
+					je actualizar_item
 
 				;Comparamos la score actual con la hi score y decidimos si actualizar o no
 				mov bx,[hi_score]
