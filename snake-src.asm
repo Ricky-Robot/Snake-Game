@@ -1195,20 +1195,27 @@ salir:				;inicia etiqueta salir
 				;Generamos aleatoriamente la posicion del nuevo item
 					mov ax,0200h	;Esta opcion obtiene el tiempo del sistema 
 					int 1Ah
+
+					;Obtendremos el renglón
 					;Usamos el modulo de 23 para evitar colisiones y ahorrarnos comparaciones
-					mov ax,0000h
+					mov ax,0d
 					mov al,dh
 					div [renglones]
-					add ah,1d
+					add ah,1d					
 					mov [item],ah
 
+					;Obtendremos columna
 					mov ax,0200h 	;Esta opcion obtiene el tiempo del sistema 
 					int 1Ah
 					;Usamos el modulo de 78 para evitar colisiones y ahorrarnos comparaciones
-					mov ax,0000h
+					mov ax,0d
 					mov al,dh
-					div [columnas]
-					add ah,21d
+					mov dh,[columnas]
+					sub dh,20d    ; DH = 78-20 = 58
+					div dh ;Obtendremos un numero que va de 0 a 57 en el residuo ah	
+					add ah,21d    ;Nos aseguramos que sea después de la columna 20 a la derecha 	
+
+
 					mov [item+1],ah
 
 					;Verificamos que si hay colisiones con el cuerpo de la serpiente por medio de la serpiente
