@@ -330,17 +330,61 @@ movimiento_condicion:
 
 	mov [tiempo_i],dx
 	timer:
-		mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
-		int     1Ah
-		sub		dx,[tiempo_i]
-		mov 	bh,00
-		mov 	bl,[speed]
-		sub		[WAIT_TIME],bx
-		cmp     dx,WAIT_TIME
-		jb      timer
+
+		mov ax,0003h  
+		int 33h       ;Obtener la informacion de estado del mouse int 33h opcion 0003h
+		cmp bx,0001h  ;Revisar si se presionó el clic izquierdo
+		je conversion_mouse_ciclo ;Si se presionó el clic izquierdo, salta a conversion_mouses_ciclo
+
+		continua_ciclo:
+			mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
+			int     1Ah
+			sub		dx,[tiempo_i]
+			mov 	bh,00
+			mov 	bl,[speed]
+			sub		[WAIT_TIME],bx
+			cmp     dx,WAIT_TIME
+			jb      timer
 
 	call MOVIMIENTO
 	jmp continuacion_movimiento
+
+;Permite verificar si el usuario presionó el botón pausa, stop o [X] en los instantes
+;cuando la víbora está en movimiento, aún cuando el movimiento de la víbora sea lento
+conversion_mouse_ciclo:
+	;cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
+	;ja restringir	    ;Si se cumple lo anterior, saltamos a la restricción del mouse
+
+	mov ax,dx 			;Copia DX en AX. DX es un valor entre 0 y 199 (renglon)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor del renglon en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov dx,ax 			;Copia AX en DX. AX es un valor entre 0 y 24 (renglon)
+
+	mov ax,cx 			;Copia CX en AX. CX es un valor entre 0 y 639 (columna)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor de la columna en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov cx,ax 			;Copia AX en CX. AX es un valor entre 0 y 79 (columna)
+
+	;Si el mouse fue presionado en el renglon 19, 20 o 21
+	;se revisara si se presiono un boton de control
+	cmp dx, 19
+	je boton_controles_ciclo 
+	cmp dx, 20
+	je boton_controles_ciclo
+	cmp dx, 21
+	je boton_controles_ciclo
+
+	;Si el mouse fue presionado en el renglon 0
+	;se va a revisar si fue dentro del boton [X]
+	cmp dx,0
+	je boton_x_ciclo
+
+	jmp continua_ciclo ;Continúa con el ciclo TIMER normal si no ha habido ningún cambio
+
 
 conversion_mouse:
 	lee_mouse
@@ -464,6 +508,26 @@ boton_controles:
 
 	jmp mouse_no_clic
 
+;Variación del método boton_controles_ciclo que ayuda a
+;verificar la pulsación de pausa o stop dentro del ciclo que controla la velocidad de le víbora
+boton_controles_ciclo:
+	cmp cx, 3d
+	je boton_pausa
+	cmp cx, 4d
+	je boton_pausa
+	cmp cx, 5d
+	je boton_pausa
+
+	cmp cx, 9d
+	je boton_reiniciar
+	cmp cx, 10d
+	je boton_reiniciar
+	cmp cx, 11d
+	je boton_reiniciar
+
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad si no hay variación
+
+
 ;Si el botón presionado fue pausa, se realiza lo siguiente
 boton_pausa:
 	cmp [status], 0 	;Si el juego esta en pausa, no se realiza nada y volvemos a ver el estado del mouse
@@ -488,6 +552,25 @@ boton_play:
 	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
 	jmp mouse
 
+;Variación del método boton_controles_ciclo que ayuda a
+;verificar la pulsación de [X] dentro del ciclo que controla la velocidad de le víbora
+boton_x_ciclo:
+	jmp boton_x1_ciclo
+;Lógica para revisar si el mouse fue presionado en [X]
+;[X] se encuentra en renglon 0 y entre columnas 17 y 19
+boton_x1_ciclo:
+	cmp cx,17
+	jge boton_x2
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad
+boton_x2_ciclo:
+	cmp cx,19
+	jbe boton_x3_ciclo
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad
+boton_x3_ciclo:
+	;Se cumplieron todas las condiciones
+	jmp salir
+
+
 boton_x:
 	jmp boton_x1
 
@@ -504,6 +587,7 @@ boton_x2:
 boton_x3:
 	;Se cumplieron todas las condiciones
 	jmp salir
+
 
 ;Si no se encontró el driver del mouse, muestra un mensaje y el usuario debe salir tecleando [enter]
 fin:
