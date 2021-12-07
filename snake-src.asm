@@ -984,7 +984,6 @@ salir:				;inicia etiqueta salir
 
 		ret 
 	endp
-
 	;procedimiento IMPRIME_BOTON
 	;Dibuja un boton que abarca 3 renglones y 5 columnas
 	;con un caracter centrado dentro del boton
@@ -1256,6 +1255,8 @@ salir:				;inicia etiqueta salir
 					jmp loop_derecha
 
 			game_over:
+				mov [direccion], 3d ;Para asegurarnos que en la siguiente partida
+									;avance hacia la derecha
 				mov [status], 0
 				call BORRA_PLAYER
 				call IMPRIME_DATOS_INICIALES
