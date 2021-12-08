@@ -712,9 +712,6 @@ salir:				;inicia etiqueta salir
 		mov [tail+2], 12d
 		mov [tail+3], 21d
 
-		mov [item], 23d
-		mov [item+1],78d
-
 		;Inicializamos contadores para ciclar
 		mov di, 4
 		mov bx, 5
@@ -933,7 +930,7 @@ salir:				;inicia etiqueta salir
 
 		push bx
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 7,cCyanClaro,bgNegro
+		imprime_caracter_color 7d,cCyanClaro,bgNegro
 		pop bx
 
 		jmp loop_tail
@@ -1103,19 +1100,7 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 20d
 				je game_over
-				;Verificamos que si hay colisiones con el cuerpo de la serpiente
-				push ax
-				push dx
-				posiciona_cursor dl,al
-				xor bx,bx
-				mov ax,0800h
-				int 10h
 
-				pop dx
-				cmp al,7d
-				je game_over
-
-				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head+1], al
 				mov [head], dl
@@ -1155,19 +1140,7 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 0d
 				je game_over
-				;Verificamos que si hay colisiones con el cuerpo de la serpiente
-				push ax
-				push dx
-				posiciona_cursor al,cl
-				xor bx,bx
-				mov ax,0800h
-				int 10h
 
-				pop dx
-				cmp al,7d
-				je game_over
-
-				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1207,19 +1180,7 @@ salir:				;inicia etiqueta salir
 				inc al
 				cmp al, 24d
 				je game_over
-				;Verificamos que si hay colisiones con el cuerpo de la serpiente
-				push ax
-				push dx
-				posiciona_cursor al,cl
-				xor bx,bx
-				mov ax,0800h
-				int 10h
 
-				pop dx
-				cmp al,7d
-				je game_over
-
-				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1257,22 +1218,11 @@ salir:				;inicia etiqueta salir
 
 				mov al, cl
 				inc al
+
 				;Verificamos las colisiones con la pared de la derecha
 				cmp al, 79d
 				je game_over
-				;Verificamos que si hay colisiones con el cuerpo de la serpiente
-				push ax
-				push dx
-				posiciona_cursor dl,al
-				xor bx,bx
-				mov ax,0800h
-				int 10h
 
-				pop dx
-				cmp al,7d
-				je game_over
-
-				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head+1], al
 				mov [head], dl
@@ -1318,9 +1268,48 @@ salir:				;inicia etiqueta salir
 				call BORRA_PLAYER
 				call IMPRIME_DATOS_INICIALES
 				jmp fin_movimiento
-				;BORRAR JUGADOR AL FINALIZAR EL JUEGO
+			
 			comida:
-			;Comparamos el renglon y la columna de la cabeza con la posicion del item 
+			; ;Verificamos si hay colisiones con el cuerpo de la serpiente
+			; 	push dx
+			; 	posiciona_cursor [head],[head+1]
+			; 	xor bx,bx
+			; 	mov ax,0800h
+			; 	int 10h
+
+			; 	pop dx
+			; 	cmp al,7d
+			; 	je game_over
+
+			mov di, 0
+			mov bx, 1
+			mov dl, [head]
+			mov cl, [head+1]
+				loop_colision_cuerpo:
+					cmp [tail+di], dl
+					jne continuacion_colision_cuerpo
+					cmp [tail+bx], cl
+					je game_over
+
+					continuacion_colision_cuerpo:
+					;Pasamos a las siguientes coordenadas del arreglo de la cola
+					add di, 2d
+					add bx, 2d
+
+					;Utilizamos el contador de elementos en la cola/cuerpo de la serpiente para saber si llegamos al final
+					mov ax, [tail_conta]
+					mul [dos]
+
+					;Comparamos la última posición iterada con el total de elementos de la cola
+					cmp di, ax
+					je fin_colision_cuerpo
+
+					;Repetimos todo el proceso si no hemos llegado al final
+					jmp loop_colision_cuerpo
+
+			fin_colision_cuerpo:
+
+			;Comparamos el renglon y la columna de la cabeza con la posicion del item
 				push bx
 				xor bx,bx
 				mov bl,[head]
