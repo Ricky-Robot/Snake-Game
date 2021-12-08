@@ -712,6 +712,9 @@ salir:				;inicia etiqueta salir
 		mov [tail+2], 12d
 		mov [tail+3], 21d
 
+		mov [item], 23d
+		mov [item+1],78d
+
 		;Inicializamos contadores para ciclar
 		mov di, 4
 		mov bx, 5
@@ -1100,6 +1103,19 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 20d
 				je game_over
+				;Verificamos que si hay colisiones con el cuerpo de la serpiente
+				push ax
+				push dx
+				posiciona_cursor dl,al
+				xor bx,bx
+				mov ax,0800h
+				int 10h
+
+				pop dx
+				cmp al,7d
+				je game_over
+
+				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head+1], al
 				mov [head], dl
@@ -1139,6 +1155,19 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 0d
 				je game_over
+				;Verificamos que si hay colisiones con el cuerpo de la serpiente
+				push ax
+				push dx
+				posiciona_cursor al,cl
+				xor bx,bx
+				mov ax,0800h
+				int 10h
+
+				pop dx
+				cmp al,7d
+				je game_over
+
+				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1178,6 +1207,19 @@ salir:				;inicia etiqueta salir
 				inc al
 				cmp al, 24d
 				je game_over
+				;Verificamos que si hay colisiones con el cuerpo de la serpiente
+				push ax
+				push dx
+				posiciona_cursor al,cl
+				xor bx,bx
+				mov ax,0800h
+				int 10h
+
+				pop dx
+				cmp al,7d
+				je game_over
+
+				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1218,7 +1260,19 @@ salir:				;inicia etiqueta salir
 				;Verificamos las colisiones con la pared de la derecha
 				cmp al, 79d
 				je game_over
+				;Verificamos que si hay colisiones con el cuerpo de la serpiente
+				push ax
+				push dx
+				posiciona_cursor dl,al
+				xor bx,bx
+				mov ax,0800h
+				int 10h
 
+				pop dx
+				cmp al,7d
+				je game_over
+
+				pop ax
 				;Movemos a la cabeza su nueva posición
 				mov [head+1], al
 				mov [head], dl
@@ -1259,6 +1313,7 @@ salir:				;inicia etiqueta salir
 			game_over:
 				mov [direccion], 3d ;Para asegurarnos que en la siguiente partida
 									;avance hacia la derecha
+				mov [tail_conta],2d
 				mov [status], 0
 				call BORRA_PLAYER
 				call IMPRIME_DATOS_INICIALES
@@ -1274,7 +1329,9 @@ salir:				;inicia etiqueta salir
 				mov bl,[head+1]
 				cmp bl,[item+1]
 				jne	actualizar_snake
-				;Actrualizamos la score
+				;Hacemos que la serpiente crezca
+				call AUMENTAR_SNAKE
+				;Actualizamos la score
 				mov bx,[score]
 				add bx,50d
 				mov [score],bx
@@ -1339,6 +1396,234 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 	
+	AUMENTAR_SNAKE proc
+		call BORRA_PLAYER
+		verificar_teclado
+		jz crecimiento
+
+		leer_teclado  	;Leemos el teclado 
+
+		cmp al, 'A'
+		je dir_izquierda_crecimiento
+		cmp al, 'a'
+		je dir_izquierda_crecimiento
+
+		cmp al, 'W'
+		je dir_arriba_crecimiento
+		cmp al, 'w'
+		je dir_arriba_crecimiento
+
+		cmp al, 'S'
+		je dir_abajo_crecimiento
+		cmp al, 's'
+		je dir_abajo_crecimiento
+
+		cmp al, 'D'
+		je dir_derecha_crecimiento
+		cmp al, 'd'
+		je dir_derecha_crecimiento
+
+		dir_izquierda_crecimiento:
+			cmp [direccion], 3d 	;Verificamos si se dirigia hacia la derecha
+			je dir_derecha_crecimiento 	;si es igual sigue su camino hacia la derecha
+
+			mov [direccion], 0d 	;Cambiamos la direccion a la izquierda
+			jmp crecimiento
+
+		dir_arriba_crecimiento:
+			cmp [direccion], 2d   ;Verificamos si se dirigia hacia abajo
+			je dir_abajo_crecimiento	;si es igual sigue su camino
+
+			mov [direccion], 1d 	;Cambiamos la direccion hacia arriba
+			jmp crecimiento
+
+		dir_abajo_crecimiento:
+			cmp [direccion], 1d   ;Verificamos si se dirigia hacia arriba
+			je dir_arriba_crecimiento	;si es igual sigue su camino
+
+			mov [direccion], 2d 	;Cambiamos la direccion hacia abajo
+			jmp crecimiento
+		dir_derecha_crecimiento:
+			cmp [direccion], 0d 	;Verificamos si se dirigia hacia la izquierda
+			je dir_izquierda_crecimiento 	;si es igual sigue su camino hacia la izquierda
+
+			mov [direccion], 3d 	;Cambiamos la direccion hacia la derecha
+			jmp crecimiento	
+
+		crecimiento:
+			mov dl, [head] 		;Guardamos el renglon de la cabeza
+			mov cl, [head+1] 	;Guardamos la columna de la cabeza
+			;Incrementamos el contador de la cola
+			mov ax, [tail_conta]
+			inc ax
+			mov [tail_conta],ax
+
+			;Comprobamos la última dirección ingresada
+			cmp [direccion], 0d
+			je izquierda_crecimiento
+
+			cmp [direccion], 1d
+			je arriba_crecimiento
+
+			cmp [direccion], 2d
+			je abajo_crecimiento
+
+			cmp [direccion], 3d
+			je derecha_crecimiento
+
+			izquierda_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, cl
+				;dec al
+				cmp al, 20d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_izquierda_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_izquierda_crecimiento
+			arriba_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				;dec al
+				cmp al, 0d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head], al
+				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_arriba_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_arriba_crecimiento
+
+			abajo_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				;inc al
+				cmp al, 24d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head], al
+				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_abajo_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_abajo_crecimiento
+
+			derecha_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, cl
+				;inc al
+				cmp al, 79d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_derecha_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_derecha_crecimiento
+			fin_crecimiento:
+		ret
+	endp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
