@@ -62,6 +62,8 @@ recordStr 		db 		"HI-SCORE"
 scoreStr 		db 		"SCORE"
 levelStr 		db 		"LEVEL"
 speedStr 		db 		"SPEED"
+finalStr 		db 		" GAME OVER "
+limpiarFinalStr db 		"           "
 
 ;Variables auxiliares para posicionar cursor al imprimir en pantalla
 col_aux  		db 		0
@@ -550,6 +552,10 @@ boton_reiniciar:
 boton_play:
 	;Limpiamos el buffer del teclado para no tomar en cuenta teclas en pausa
 	limpiar_buffer
+
+	;Borramos la cadena de fin de juego
+	posiciona_cursor 1,5
+	imprime_cadena_color [limpiarFinalStr],11,cNegro,bgNegro
 
 	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
 	jmp mouse
@@ -1266,6 +1272,11 @@ salir:				;inicia etiqueta salir
 				mov [tail_conta],2d
 				mov [status], 0
 				call BORRA_PLAYER
+				
+				;imprimir cadena 
+				posiciona_cursor 1,5
+				imprime_cadena_color [finalStr],11,cNegro,bgCyanClaro
+
 				call IMPRIME_DATOS_INICIALES
 				jmp fin_movimiento
 			
