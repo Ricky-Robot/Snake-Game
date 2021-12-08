@@ -62,6 +62,8 @@ recordStr 		db 		"HI-SCORE"
 scoreStr 		db 		"SCORE"
 levelStr 		db 		"LEVEL"
 speedStr 		db 		"SPEED"
+finalStr 		db 		" GAME OVER "
+limpiarFinalStr db 		"           "
 
 ;Variables auxiliares para posicionar cursor al imprimir en pantalla
 col_aux  		db 		0
@@ -330,17 +332,63 @@ movimiento_condicion:
 
 	mov [tiempo_i],dx
 	timer:
-		mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
-		int     1Ah
-		sub		dx,[tiempo_i]
-		mov 	bh,00
-		mov 	bl,[speed]
-		sub		[WAIT_TIME],bx
-		cmp     dx,WAIT_TIME
-		jb      timer
+
+		mov ax,0003h  
+		int 33h       ;Obtener la informacion de estado del mouse int 33h opcion 0003h
+		cmp bx,0001h  ;Revisar si se presionó el clic izquierdo
+		je conversion_mouse_ciclo ;Si se presionó el clic izquierdo, salta a conversion_mouses_ciclo
+
+		mov WAIT_TIME, 13d
+
+		continua_ciclo:
+			mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
+			int     1Ah
+			sub		dx,[tiempo_i]
+			mov 	bh,00
+			mov 	bl,[speed]
+			sub		[WAIT_TIME],bx
+			cmp     dx,WAIT_TIME
+			jb      timer
 
 	call MOVIMIENTO
 	jmp continuacion_movimiento
+
+;Permite verificar si el usuario presionó el botón pausa, stop o [X] en los instantes
+;cuando la víbora está en movimiento, aún cuando el movimiento de la víbora sea lento
+conversion_mouse_ciclo:
+	;cmp cx,160 		;Verificamos si la posición del mouse esta fuera del area restringida
+	;ja restringir	    ;Si se cumple lo anterior, saltamos a la restricción del mouse
+
+	mov ax,dx 			;Copia DX en AX. DX es un valor entre 0 y 199 (renglon)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor del renglon en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov dx,ax 			;Copia AX en DX. AX es un valor entre 0 y 24 (renglon)
+
+	mov ax,cx 			;Copia CX en AX. CX es un valor entre 0 y 639 (columna)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor de la columna en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov cx,ax 			;Copia AX en CX. AX es un valor entre 0 y 79 (columna)
+
+	;Si el mouse fue presionado en el renglon 19, 20 o 21
+	;se revisara si se presiono un boton de control
+	cmp dx, 19
+	je boton_controles_ciclo 
+	cmp dx, 20
+	je boton_controles_ciclo
+	cmp dx, 21
+	je boton_controles_ciclo
+
+	;Si el mouse fue presionado en el renglon 0
+	;se va a revisar si fue dentro del boton [X]
+	cmp dx,0
+	je boton_x_ciclo
+
+	jmp continua_ciclo ;Continúa con el ciclo TIMER normal si no ha habido ningún cambio
+
 
 conversion_mouse:
 	lee_mouse
@@ -464,6 +512,26 @@ boton_controles:
 
 	jmp mouse_no_clic
 
+;Variación del método boton_controles_ciclo que ayuda a
+;verificar la pulsación de pausa o stop dentro del ciclo que controla la velocidad de le víbora
+boton_controles_ciclo:
+	cmp cx, 3d
+	je boton_pausa
+	cmp cx, 4d
+	je boton_pausa
+	cmp cx, 5d
+	je boton_pausa
+
+	cmp cx, 9d
+	je boton_reiniciar
+	cmp cx, 10d
+	je boton_reiniciar
+	cmp cx, 11d
+	je boton_reiniciar
+
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad si no hay variación
+
+
 ;Si el botón presionado fue pausa, se realiza lo siguiente
 boton_pausa:
 	cmp [status], 0 	;Si el juego esta en pausa, no se realiza nada y volvemos a ver el estado del mouse
@@ -485,8 +553,31 @@ boton_play:
 	;Limpiamos el buffer del teclado para no tomar en cuenta teclas en pausa
 	limpiar_buffer
 
+	;Borramos la cadena de fin de juego
+	posiciona_cursor 1,5
+	imprime_cadena_color [limpiarFinalStr],11,cNegro,bgNegro
+
 	mov [status], 1d  	;Pone el estado en modo jugar y se vuelve verificar el mouse
 	jmp mouse
+
+;Variación del método boton_controles_ciclo que ayuda a
+;verificar la pulsación de [X] dentro del ciclo que controla la velocidad de le víbora
+boton_x_ciclo:
+	jmp boton_x1_ciclo
+;Lógica para revisar si el mouse fue presionado en [X]
+;[X] se encuentra en renglon 0 y entre columnas 17 y 19
+boton_x1_ciclo:
+	cmp cx,17
+	jge boton_x2
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad
+boton_x2_ciclo:
+	cmp cx,19
+	jbe boton_x3_ciclo
+	jmp continua_ciclo ;Continúa con el ciclo de velocidad
+boton_x3_ciclo:
+	;Se cumplieron todas las condiciones
+	jmp salir
+
 
 boton_x:
 	jmp boton_x1
@@ -504,6 +595,7 @@ boton_x2:
 boton_x3:
 	;Se cumplieron todas las condiciones
 	jmp salir
+
 
 ;Si no se encontró el driver del mouse, muestra un mensaje y el usuario debe salir tecleando [enter]
 fin:
@@ -844,7 +936,7 @@ salir:				;inicia etiqueta salir
 
 		push bx
 		posiciona_cursor [ren_aux],[col_aux]
-		imprime_caracter_color 7,cCyanClaro,bgNegro
+		imprime_caracter_color 7d,cCyanClaro,bgNegro
 		pop bx
 
 		jmp loop_tail
@@ -900,7 +992,6 @@ salir:				;inicia etiqueta salir
 
 		ret 
 	endp
-
 	;procedimiento IMPRIME_BOTON
 	;Dibuja un boton que abarca 3 renglones y 5 columnas
 	;con un caracter centrado dentro del boton
@@ -1015,6 +1106,7 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 20d
 				je game_over
+
 				;Movemos a la cabeza su nueva posición
 				mov [head+1], al
 				mov [head], dl
@@ -1054,6 +1146,7 @@ salir:				;inicia etiqueta salir
 				dec al
 				cmp al, 0d
 				je game_over
+
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1093,6 +1186,7 @@ salir:				;inicia etiqueta salir
 				inc al
 				cmp al, 24d
 				je game_over
+
 				;Movemos a la cabeza su nueva posición
 				mov [head], al
 				mov [head+1], cl
@@ -1130,6 +1224,7 @@ salir:				;inicia etiqueta salir
 
 				mov al, cl
 				inc al
+
 				;Verificamos las colisiones con la pared de la derecha
 				cmp al, 79d
 				je game_over
@@ -1172,13 +1267,60 @@ salir:				;inicia etiqueta salir
 					jmp loop_derecha
 
 			game_over:
+				mov [direccion], 3d ;Para asegurarnos que en la siguiente partida
+									;avance hacia la derecha
+				mov [tail_conta],2d
 				mov [status], 0
 				call BORRA_PLAYER
+				
+				;imprimir cadena 
+				posiciona_cursor 1,5
+				imprime_cadena_color [finalStr],11,cNegro,bgCyanClaro
+
 				call IMPRIME_DATOS_INICIALES
 				jmp fin_movimiento
-				;BORRAR JUGADOR AL FINALIZAR EL JUEGO
+			
 			comida:
-			;Comparamos el renglon y la columna de la cabeza con la posicion del item 
+			; ;Verificamos si hay colisiones con el cuerpo de la serpiente
+			; 	push dx
+			; 	posiciona_cursor [head],[head+1]
+			; 	xor bx,bx
+			; 	mov ax,0800h
+			; 	int 10h
+
+			; 	pop dx
+			; 	cmp al,7d
+			; 	je game_over
+
+			mov di, 0
+			mov bx, 1
+			mov dl, [head]
+			mov cl, [head+1]
+				loop_colision_cuerpo:
+					cmp [tail+di], dl
+					jne continuacion_colision_cuerpo
+					cmp [tail+bx], cl
+					je game_over
+
+					continuacion_colision_cuerpo:
+					;Pasamos a las siguientes coordenadas del arreglo de la cola
+					add di, 2d
+					add bx, 2d
+
+					;Utilizamos el contador de elementos en la cola/cuerpo de la serpiente para saber si llegamos al final
+					mov ax, [tail_conta]
+					mul [dos]
+
+					;Comparamos la última posición iterada con el total de elementos de la cola
+					cmp di, ax
+					je fin_colision_cuerpo
+
+					;Repetimos todo el proceso si no hemos llegado al final
+					jmp loop_colision_cuerpo
+
+			fin_colision_cuerpo:
+
+			;Comparamos el renglon y la columna de la cabeza con la posicion del item
 				push bx
 				xor bx,bx
 				mov bl,[head]
@@ -1187,7 +1329,9 @@ salir:				;inicia etiqueta salir
 				mov bl,[head+1]
 				cmp bl,[item+1]
 				jne	actualizar_snake
-				;Actrualizamos la score
+				;Hacemos que la serpiente crezca
+				call AUMENTAR_SNAKE
+				;Actualizamos la score
 				mov bx,[score]
 				add bx,50d
 				mov [score],bx
@@ -1252,6 +1396,234 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 	
+	AUMENTAR_SNAKE proc
+		call BORRA_PLAYER
+		verificar_teclado
+		jz crecimiento
+
+		leer_teclado  	;Leemos el teclado 
+
+		cmp al, 'A'
+		je dir_izquierda_crecimiento
+		cmp al, 'a'
+		je dir_izquierda_crecimiento
+
+		cmp al, 'W'
+		je dir_arriba_crecimiento
+		cmp al, 'w'
+		je dir_arriba_crecimiento
+
+		cmp al, 'S'
+		je dir_abajo_crecimiento
+		cmp al, 's'
+		je dir_abajo_crecimiento
+
+		cmp al, 'D'
+		je dir_derecha_crecimiento
+		cmp al, 'd'
+		je dir_derecha_crecimiento
+
+		dir_izquierda_crecimiento:
+			cmp [direccion], 3d 	;Verificamos si se dirigia hacia la derecha
+			je dir_derecha_crecimiento 	;si es igual sigue su camino hacia la derecha
+
+			mov [direccion], 0d 	;Cambiamos la direccion a la izquierda
+			jmp crecimiento
+
+		dir_arriba_crecimiento:
+			cmp [direccion], 2d   ;Verificamos si se dirigia hacia abajo
+			je dir_abajo_crecimiento	;si es igual sigue su camino
+
+			mov [direccion], 1d 	;Cambiamos la direccion hacia arriba
+			jmp crecimiento
+
+		dir_abajo_crecimiento:
+			cmp [direccion], 1d   ;Verificamos si se dirigia hacia arriba
+			je dir_arriba_crecimiento	;si es igual sigue su camino
+
+			mov [direccion], 2d 	;Cambiamos la direccion hacia abajo
+			jmp crecimiento
+		dir_derecha_crecimiento:
+			cmp [direccion], 0d 	;Verificamos si se dirigia hacia la izquierda
+			je dir_izquierda_crecimiento 	;si es igual sigue su camino hacia la izquierda
+
+			mov [direccion], 3d 	;Cambiamos la direccion hacia la derecha
+			jmp crecimiento	
+
+		crecimiento:
+			mov dl, [head] 		;Guardamos el renglon de la cabeza
+			mov cl, [head+1] 	;Guardamos la columna de la cabeza
+			;Incrementamos el contador de la cola
+			mov ax, [tail_conta]
+			inc ax
+			mov [tail_conta],ax
+
+			;Comprobamos la última dirección ingresada
+			cmp [direccion], 0d
+			je izquierda_crecimiento
+
+			cmp [direccion], 1d
+			je arriba_crecimiento
+
+			cmp [direccion], 2d
+			je abajo_crecimiento
+
+			cmp [direccion], 3d
+			je derecha_crecimiento
+
+			izquierda_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, cl
+				;dec al
+				cmp al, 20d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_izquierda_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_izquierda_crecimiento
+			arriba_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				;dec al
+				cmp al, 0d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head], al
+				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_arriba_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_arriba_crecimiento
+
+			abajo_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, dl
+				;inc al
+				cmp al, 24d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head], al
+				mov [head+1], cl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_abajo_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_abajo_crecimiento
+
+			derecha_crecimiento:
+				;Movemos la cabeza
+				push ax 	;Almacenamos la referencia de AX por si las dudas
+				
+				mov al, cl
+				;inc al
+				cmp al, 79d
+				je game_over
+				;Movemos a la cabeza su nueva posición
+				mov [head+1], al
+				mov [head], dl
+
+				pop ax 	;Retornamos la referencia de AX por si las dudas
+
+				mov di, 0
+				mov bx, 1
+				loop_derecha_crecimiento:
+					;Guardamos una referencia al valor de la cola posterior
+					push word ptr [tail+di]
+					push word ptr [tail+bx]
+
+					;Movemos a tail lo que estaba en su posición contigua
+					mov [tail+di], dl
+					mov [tail+bx], cl
+
+					add di, 2d
+					add bx, 2d
+
+					pop cx
+					pop dx
+
+					mov ax, [tail_conta]
+					mul [dos]
+
+					cmp di, ax
+					je fin_crecimiento
+					jmp loop_derecha_crecimiento
+			fin_crecimiento:
+		ret
+	endp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
