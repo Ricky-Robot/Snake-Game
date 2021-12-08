@@ -336,6 +336,8 @@ movimiento_condicion:
 		cmp bx,0001h  ;Revisar si se presionó el clic izquierdo
 		je conversion_mouse_ciclo ;Si se presionó el clic izquierdo, salta a conversion_mouses_ciclo
 
+		mov WAIT_TIME, 13d
+
 		continua_ciclo:
 			mov    	ax, 0000h	;Opcion para leer el tiempo del sistema actual
 			int     1Ah
