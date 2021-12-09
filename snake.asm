@@ -130,6 +130,7 @@ dos 			db 		2 		;Variable con valor de  dos para multiplicaciones
 WAIT_TIME  		dw  	13d	;Variable que nos ayuda a controlar el tiempo de movimiento
 renglones		db 		23d  ;Valor que nos ayuda a dividir para evitar colisiones
 columnas		db 		78d  ;Valor que nos ayuda a dividir para evitar colisiones
+quiniela		dw 		500d; Valor que nos ayuda para aumetar progresivamente la velocidad
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -1281,17 +1282,6 @@ salir:				;inicia etiqueta salir
 				jmp fin_movimiento
 			
 			comida:
-			; ;Verificamos si hay colisiones con el cuerpo de la serpiente
-			; 	push dx
-			; 	posiciona_cursor [head],[head+1]
-			; 	xor bx,bx
-			; 	mov ax,0800h
-			; 	int 10h
-
-			; 	pop dx
-			; 	cmp al,7d
-			; 	je game_over
-
 			mov di, 0
 			mov bx, 1
 			mov dl, [head]
@@ -1373,17 +1363,30 @@ salir:				;inicia etiqueta salir
 					cmp al,7d
 					je actualizar_item
 
+				;Comparamos la score para subir la velocidad
+				mov dx,0000h
+				mov ax,[score]
+				div [quiniela] 
+				cmp dx,0
+				je aumentar_speed
+				fin_aumentar_speed:
 				;Comparamos la score actual con la hi score y decidimos si actualizar o no
 				mov bx,[hi_score]
 				cmp bx,[score]
 				jb  actualizar_hi_score
 
 				jmp actualizar_snake
-
 			actualizar_hi_score:
 				mov bx,[score]
 				mov [hi_score],bx
 				jmp actualizar_snake
+			aumentar_speed:
+				mov ax,0000h
+				mov al,[speed]
+				inc ax 
+				mov [speed],al
+				call IMPRIME_SPEED
+				jmp fin_aumentar_speed
 			;Actualizamos la serpiente en pantalla, redibujandola
 			actualizar_snake:
 				pop bx
